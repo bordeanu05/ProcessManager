@@ -1,35 +1,52 @@
 #include "../include/process.h"
+#include <iostream>
 
-Process::Process() : m_pid(0), m_cpu(0), m_mem(0) {}
+namespace process_util {
 
-Process::Process(const int32_t& pid, const int32_t& cpu, const int32_t& mem) : m_pid(pid), m_cpu(cpu), m_mem(mem) {}
+Process::Process() : m_name("nan"), m_user("nan"), m_pid(0), m_mem(0), m_cpu(0) {}
+
+Process::Process(const std::string& name, const std::string& user, const int32_t& pid, const int32_t& mem, const double& cpu) : m_name(name), m_user(user), m_pid(pid), m_mem(mem), m_cpu(cpu) {}
 
 Process::~Process() {}
 
-int32_t Process::getPid() const {
-    return m_pid;
+std::string Process::getName() const {
+    return m_name;
 }
 
-int32_t Process::getCpu() const {
-    return m_cpu;
+std::string Process::getUser() const {
+    return m_user;
+}
+
+int32_t Process::getPid() const {
+    return m_pid;
 }
 
 int32_t Process::getMem() const {
     return m_mem;
 }
 
-void Process::setPid(const int32_t& pid) {
-    m_pid = pid;
+double Process::getCpu() const {
+    return m_cpu;
 }
 
-void Process::setCpu(const int32_t& cpu) {
-    m_cpu = cpu;
+void Process::setName(const std::string& name) {
+    m_name = name;
+}
+
+void Process::setUser(const std::string& user) {
+    m_user = user;
+}
+
+void Process::setPid(const int32_t& pid) {
+    m_pid = pid;
 }
 
 void Process::setMem(const int32_t& mem) {
     m_mem = mem;
 }
 
-void Process::printResources() const {
-    std::cout << "PID: " << m_pid << " | " << "CPU: " << m_cpu << '%' << " | " << "MEM: " << m_mem << "KB" << std::endl;
+void Process::setCpu(const double& cpu) {
+    m_cpu = cpu;
 }
+
+} // namespace process_util

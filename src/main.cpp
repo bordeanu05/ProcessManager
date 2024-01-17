@@ -1,151 +1,52 @@
 #include <iostream>
 #include <cstdint>
-#include <dirent.h>
-#include <cstring>
-#include <cstdlib>
-#include <vector>
-#include <fstream>
-#include <sstream>
 #include <thread>
 #include <chrono>
+#include <vector>
+#include <iomanip>
+#include <sstream>
 
-#include "../include/process.h"
+#include "../include/process_util.h"
 
-// This is used to get the total CPU time for all processes
-uint64_t getTotalCpuTime() {
-    std::ifstream statFile("/proc/stat");
+void printHeader(const double& totalCpuPercentage) {
+    std::ostringstream cpuPercentage;
+    cpuPercentage << "CPU(" << std::fixed << std::setprecision(2) << totalCpuPercentage << '%' << ')';
 
-    if (statFile.is_open()) {
-        std::string line;
-        std::getline(statFile, line);
-        statFile.close();
+    std::ostringstream memUsage;
+    memUsage << "Memory(" << std::fixed << std::setprecision(2) << process_util::getTotalMemUsage() << '%' << ')';
 
-        std::istringstream iss(line);
-
-        std::string cpu;
-        uint64_t user, nice, system, idle, iowait, irq, softirq, steal;
-
-        iss >> cpu >> user >> nice >> system >> idle >> iowait >> irq >> softirq >> steal;
-
-        return user + nice + system + idle + iowait + irq + softirq + steal;
-    }
-    else {
-        std::cerr << "Error: Could not open /proc/stat" << std::endl;
-        return 0;
-    }
+    std::cout << std::left << std::setw(10) << "PID" << std::setw(25) << "Name" << std::setw(25) << "User" << std::setw(25) << cpuPercentage.str() << std::setw(25) << memUsage.str() << std::endl;
+    std::cout << std::string(110, '-') << std::endl;
 }
 
-// This is used to get the CPU time for a specific process
-uint64_t getProcessCpuTime(const uint32_t& pid) {
-    std::ifstream statFile("/proc/" + std::to_string(pid) + "/stat");
+void printProcessInfo(const process_util::Process& process) {
+    std::ostringstream cpuPercentage;
+    cpuPercentage << std::fixed << std::setprecision(2) << process.getCpu() << '%';
 
-    if (statFile.is_open()) {
-        std::string line;
-        std::getline(statFile, line);
-        statFile.close();
+    std::ostringstream memPercentage;
+    memPercentage << std::fixed << std::setprecision(2) << process.getMem() << "KB";
 
-        std::istringstream iss(line);
-
-        for (uint32_t i = 0; i < 13; ++i) {
-            std::string temp;
-            iss >> temp;
-        }
-
-        uint64_t utime, stime;
-        iss >> utime >> stime;
-
-        return (utime + stime);
-    }
-    else {
-        std::cerr << "Error: Could not open /proc/" << pid << "/stat" << std::endl;
-        return 0;
-    }
+    std::cout << std::left << std::setw(10) << process.getPid() << std::setw(25) << process.getName() << std::setw(25) << process.getUser() << std::setw(25) << cpuPercentage.str() << std::setw(25) << memPercentage.str() << std::endl;
 }
 
-// This is used to get the memory usage for a specific process
-uint64_t getProcessMem(const uint32_t& pid) {
-    std::string path = "/proc/" + std::to_string(pid) + "/statm";
-
-    std::ifstream statmFile(path);
-
-    if (statmFile.is_open()) {
-        std::string line;
-        std::getline(statmFile, line);
-        statmFile.close();
-
-        std::istringstream iss(line);
-
-        uint64_t mem;
-        iss >> mem;
-
-        return mem;
-    }
-    else {
-        std::cerr << "Error: Could not open " << path << std::endl;
-        return 0;
-    }
-}
-
-// This is used to get the process information
-Process getProcessInfo(const uint32_t& pid, const uint64_t& totalCpuTime) {
-    Process process;
-    uint64_t processCpuTime = getProcessCpuTime(pid);
-    uint32_t cpu = static_cast<uint32_t>((processCpuTime * 100) / (totalCpuTime));
-    uint32_t mem = static_cast<uint32_t>(getProcessMem(pid));
-
-    return Process(pid, cpu, mem);
-}
-
-// This is used to get all the processes with their information
-std::vector<Process> getProccesses() {
-    std::vector<Process> processes;
-
-    DIR* dir = opendir("/proc");
-    if (dir == nullptr) {
-        std::cerr << "Error: Could not open /proc" << std::endl;
-        return processes;
-    }
-
-    uint64_t totalCpuTime = getTotalCpuTime();
-
-    dirent* entry = readdir(dir);
-
-    while (entry != nullptr) {
-        if (entry->d_type == DT_DIR) {
-            char* end;
-            int32_t pid = strtol(entry->d_name, &end, 10);
-            if (*end == '\0') {
-                processes.push_back(getProcessInfo(pid, totalCpuTime));
-            }
-        }
-        entry = readdir(dir);
-    }
-
-    closedir(dir);
-
-    return processes;
-}
-
-int main() {
-    int previousLineCount = 0;
+int main(int argc, char** argv) {
+    double cpuPercentage = 0.0;
 
     while (true) {
-        std::vector<Process> processes = getProccesses();
+        system("clear");
 
-        // Clear the previously printed lines
-        for (int i = 0; i < previousLineCount; ++i) {
-            std::cout << "\033[A\033[K"; // Move up and clear line
-        }
+        std::vector<int64_t> startCPUTimes = process_util::getSystemCpuTimes();
+        std::vector<process_util::Process> processes = process_util::getProccesses();
 
-        // Print new process information
+        printHeader(cpuPercentage);
         for (auto& process : processes) {
-            process.printResources();
+            printProcessInfo(process);
         }
 
         std::this_thread::sleep_for(std::chrono::seconds(1));
 
-        // Update the line count for the next iteration
-        previousLineCount = processes.size();
+        std::vector<int64_t> endCPUTimes = process_util::getSystemCpuTimes();
+        cpuPercentage = process_util::getSystemCpuPercentage(startCPUTimes, endCPUTimes);
     }
 
     return 0;
